@@ -1,0 +1,234 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Impostor de Fútbol LEGEND+</title>
+
+<style>
+body{margin:0;font-family:Arial;background:#05070d;color:white;text-align:center;}
+.container{max-width:760px;margin:auto;padding:20px;}
+.card{background:#111827;border-radius:14px;padding:20px;box-shadow:0 0 20px rgba(0,0,0,.6);}
+button{background:#ef4444;border:none;color:white;padding:12px 18px;margin:8px;border-radius:10px;font-size:16px;cursor:pointer;}
+button:hover{background:#dc2626;}
+input{padding:8px;border-radius:8px;border:none;margin:5px;font-size:16px;}
+.hidden{display:none;}
+.voteBtn{display:block;margin:10px auto;width:80%;}
+.topbar{background:#020617;padding:10px;font-size:14px;}
+.scoreBox{margin-top:10px;font-size:13px;}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+Ronda: <span id="round">1</span>/<span id="totalRounds">1</span>
+<div id="scoreBoard" class="scoreBox"></div>
+</div>
+
+<div class="container card">
+
+<h1>⚽ Impostor de Fútbol LEGEND+</h1>
+
+<div id="setup">
+<p>Jugadores (1-20)</p>
+<input type="number" id="players" min="1" max="20" value="5">
+<p>Impostores</p>
+<input type="number" id="impostors" min="1" max="5" value="1">
+<p>Tiempo votación (MINUTOS)</p>
+<input type="number" id="voteTime" min="1" max="10" value="1">
+<button onclick="createNameInputs()">Continuar</button>
+</div>
+
+<div id="namesScreen" class="hidden">
+<h2>Nombres</h2>
+<div id="namesContainer"></div>
+<p>Número de rondas:</p>
+<input type="number" id="roundInput" min="1" max="20" value="3">
+<button onclick="startGame()">Empezar</button>
+</div>
+
+<div id="roleScreen" class="hidden">
+<h2 id="playerTurn"></h2>
+<p id="roleText">Rol oculto</p>
+<button onclick="revealRole()">Desocultar</button>
+<button id="nextBtn" class="hidden" onclick="nextPlayer()">Siguiente jugador</button>
+</div>
+
+<div id="voteScreen" class="hidden">
+<h2>🗳️ Votación</h2>
+<p>Tiempo restante: <span id="timer"></span></p>
+<div id="voteButtons"></div>
+</div>
+
+<div id="resultScreen" class="hidden">
+<h2 id="resultText"></h2>
+<button onclick="nextRound()">Siguiente ronda</button>
+</div>
+
+</div>
+
+<script>
+const playersList=[
+"Lionel Messi","Cristiano Ronaldo","Kylian Mbappé","Neymar Jr.","Erling Haaland",
+"Kevin De Bruyne","Luka Modrić","Karim Benzema","Robert Lewandowski","Mohamed Salah"
+];
+
+let names=[],roles=[],scores={};
+let alivePlayers=[];
+let totalPlayers,totalImpostors,voteMinutes;
+let currentPlayer=0;
+let chosenPlayer="";
+let round=1,totalRounds=1;
+
+function updateScoreBoard(){
+    let text="";
+    names.forEach(n=>{
+        text+=n+": "+(scores[n]||0)+" | ";
+    });
+    document.getElementById("scoreBoard").innerText=text;
+}
+
+function createNameInputs(){
+    totalPlayers=parseInt(players.value);
+    setup.classList.add("hidden");
+    namesScreen.classList.remove("hidden");
+    namesContainer.innerHTML="";
+    for(let i=0;i<totalPlayers;i++){
+        let inp=document.createElement("input");
+        inp.placeholder="Jugador "+(i+1);
+        namesContainer.appendChild(inp);
+    }
+}
+
+function startGame(){
+    voteMinutes=parseInt(voteTime.value);
+    totalImpostors=parseInt(impostors.value);
+    totalRounds=parseInt(roundInput.value);
+    document.getElementById("totalRounds").innerText=totalRounds;
+
+    names=[...namesContainer.querySelectorAll("input")]
+        .map((i,idx)=>i.value||("Jugador "+(idx+1)));
+
+    names.forEach(n=>scores[n]=0);
+    startRound();
+}
+
+function startRound(){
+    chosenPlayer=playersList[Math.floor(Math.random()*playersList.length)];
+    roles=new Array(names.length).fill("Jugador");
+
+    let count=0;
+    while(count<totalImpostors){
+        let r=Math.floor(Math.random()*names.length);
+        if(roles[r]!=="Impostor"){
+            roles[r]="Impostor";
+            count++;
+        }
+    }
+
+    alivePlayers=[...names.keys()];
+    namesScreen.classList.add("hidden");
+    roleScreen.classList.remove("hidden");
+    resultScreen.classList.add("hidden");
+    voteScreen.classList.add("hidden");
+    currentPlayer=0;
+    updateScoreBoard();
+    showRole();
+}
+
+function showRole(){
+    playerTurn.innerText=names[currentPlayer]+", toca tu turno";
+    roleText.innerText="Rol oculto";
+}
+
+function revealRole(){
+    if(roles[currentPlayer]==="Impostor"){
+        roleText.innerText="😈 Eres IMPOSTOR";
+    }else{
+        roleText.innerText="⚽ Jugador: "+chosenPlayer;
+    }
+    nextBtn.classList.remove("hidden");
+}
+
+function nextPlayer(){
+    nextBtn.classList.add("hidden");
+    currentPlayer++;
+    if(currentPlayer>=names.length){
+        startVoting();
+    }else{
+        showRole();
+    }
+}
+
+function startVoting(){
+    roleScreen.classList.add("hidden");
+    voteScreen.classList.remove("hidden");
+
+    let seconds=voteMinutes*60;
+    timer.innerText=seconds+" s";
+
+    renderVoteButtons();
+
+    const countdown=setInterval(()=>{
+        seconds--;
+        timer.innerText=seconds+" s";
+        if(seconds<=0){
+            clearInterval(countdown);
+            impostorWin();
+        }
+    },1000);
+}
+
+function renderVoteButtons(){
+    voteButtons.innerHTML="";
+    alivePlayers.forEach(index=>{
+        let b=document.createElement("button");
+        b.className="voteBtn";
+        b.innerText="Votar a "+names[index];
+        b.onclick=()=>vote(index);
+        voteButtons.appendChild(b);
+    });
+}
+
+function vote(index){
+    if(roles[index]==="Impostor"){
+        alivePlayers.forEach(i=>{
+            if(roles[i]!=="Impostor") scores[names[i]]++;
+        });
+        endRound("✅ ¡Encontraron al impostor!");
+    }else{
+        alivePlayers=alivePlayers.filter(i=>i!==index);
+        renderVoteButtons();
+        alert(names[index]+" NO era impostor. La ronda continúa.");
+    }
+}
+
+function impostorWin(){
+    alivePlayers.forEach(i=>{
+        if(roles[i]==="Impostor") scores[names[i]]++;
+    });
+    endRound("⏰ Tiempo acabado. ¡Ganan los impostores!");
+}
+
+function endRound(msg){
+    voteScreen.classList.add("hidden");
+    resultScreen.classList.remove("hidden");
+    resultText.innerText=msg;
+    updateScoreBoard();
+}
+
+function nextRound(){
+    round++;
+    document.getElementById("round").innerText=round;
+    if(round>totalRounds){
+        resultText.innerText="🏆 Juego terminado";
+        return;
+    }
+    startRound();
+}
+</script>
+
+</body>
+</html>
